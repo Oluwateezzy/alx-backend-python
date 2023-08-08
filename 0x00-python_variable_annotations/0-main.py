@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
-safe_first_element =  __import__('100-safe_first_element').safe_first_element
+zoom_array =  __import__('102-type_checking').zoom_array
 
-print(safe_first_element.__annotations__)
+print(zoom_array.__annotations__)
