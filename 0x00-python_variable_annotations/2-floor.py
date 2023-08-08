@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import math
 """
-floor
+floor module
 """
 
 
