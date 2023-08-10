@@ -2,10 +2,12 @@
 """ wait random"""
 
 from asyncio import sleep
-from random import uniform
+from random import random
 
 
 async def wait_random(max_delay=10):
-    delay = uniform(0, max_delay)
+    """ wait random"""
+
+    delay = random() * max_delay
     await sleep(delay)
     return delay
