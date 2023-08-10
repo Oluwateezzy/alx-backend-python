@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+""" wait random"""
 
 import asyncio
 from typing import List
