@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-async_gen = __import__('0-async_generator').async_generator
-
 """async await"""
 
 from typing import List
+
+async_gen = __import__('0-async_generator').async_generator
 
 
 async def async_comprehension() -> List[float]:
