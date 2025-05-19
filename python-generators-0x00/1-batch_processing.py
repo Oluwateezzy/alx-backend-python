@@ -19,4 +19,4 @@ def stream_users_in_batches(batch_size):
 def batch_processing(batch_size):
     """Yield users over 25 from batched stream"""
     for batch in stream_users_in_batches(batch_size):
-        yield from (user for user in batch if user["age"] > 25)
+        return (user for user in batch if user["age"] > 25)
