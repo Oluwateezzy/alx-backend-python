@@ -10,7 +10,7 @@ def log_queries(func):
         # Extract the query from either args or kwargs
         query = kwargs.get("query", None)
         if query is None and len(args) > 0:
-            query = args[0]  # assuming query is the first positional argument
+            query = args[0]
 
         # Log the query with timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
