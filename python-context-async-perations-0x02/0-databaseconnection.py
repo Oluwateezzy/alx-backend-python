@@ -23,3 +23,8 @@ class DatabaseConnection:
         if exc_type is not None:
             print(f"An error occurred: {exc_val}")
         return True
+
+with DatabaseConnection("users.db") as cursor:
+    cursor.execute("SELECT * FROM users")
+    results = cursor.fetchall()
+    print(results)
