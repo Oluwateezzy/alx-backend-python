@@ -23,7 +23,7 @@ async def async_fetch_older_users(db_path):
 
 
 async def fetch_concurrently():
-    db_path = "example.db"
+    db_path = "users.db"
     # Create test database if it doesn't exist
     async with aiosqlite.connect(db_path) as db:
         await db.execute(
