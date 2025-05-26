@@ -31,7 +31,4 @@ async def fetch_concurrently():
     )
     return results
 
-
-if __name__ == "__main__":
-    # Run the concurrent fetch
-    asyncio.run(fetch_concurrently())
+asyncio.run(fetch_concurrently())
