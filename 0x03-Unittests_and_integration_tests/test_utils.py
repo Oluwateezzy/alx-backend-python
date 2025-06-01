@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from typing import Any, Mapping, Sequence
 import unittest
 from utils import access_nested_map
