@@ -19,7 +19,7 @@ class TestGithubOrgClient(unittest.TestCase):
         mock_get_json: unittest.mock.Mock
     ) -> None:
         """Test that GithubOrgClient.org returns correct value.
-        
+
         Args:
             org_name: The organization name to test
             mock_get_json: Mock for get_json function
@@ -43,13 +43,15 @@ class TestGithubOrgClient(unittest.TestCase):
         result2 = client.org
         self.assertEqual(result2, test_payload)
         mock_get_json.assert_called_once()
-    
+
     def test_public_repos_url(self) -> None:
-        """Test that _public_repos_url returns the correct URL from org payload."""
+        """
+        Test that _public_repos_url returns the correct URL from org payload.
+        """
         test_payload = {
             "repos_url": "https://api.github.com/orgs/testorg/repos"
         }
-        
+    
         with patch(
             'client.GithubOrgClient.org',
             new_callable=PropertyMock
@@ -58,7 +60,7 @@ class TestGithubOrgClient(unittest.TestCase):
             client = GithubOrgClient("testorg")
             result = client._public_repos_url
             self.assertEqual(result, test_payload["repos_url"])
-    
+
     @patch('client.get_json')
     def test_public_repos(self, mock_get_json: unittest.mock.Mock) -> None:
         """Test that public_repos returns the correct list of repos."""
@@ -74,8 +76,8 @@ class TestGithubOrgClient(unittest.TestCase):
 
         with patch(
             'client.GithubOrgClient._public_repos_url',
-                new_callable=PropertyMock
-            ) as mock_public_repos_url:
+            new_callable=PropertyMock
+        ) as mock_public_repos_url:
             mock_public_repos_url.return_value = test_repos_url
 
             client = GithubOrgClient("testorg")
