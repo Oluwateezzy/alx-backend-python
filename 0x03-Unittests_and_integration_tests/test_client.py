@@ -126,12 +126,10 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         cls.mock_get = cls.get_patcher.start()
 
         def side_effect(url):
-            """
-            Side effect function to return different payloads based on URL
-            """
-            if url.endswith("/orgs/google"):
+            """Return different payloads based on the requested URL."""
+            if url == "https://api.github.com/orgs/google":
                 return Mock(json=lambda: cls.org_payload)
-            if url.endswith("/repos/google/repos"):
+            if url == cls.org_payload["repos_url"]:
                 return Mock(json=lambda: cls.repos_payload)
             return Mock(json=lambda: None)
 
@@ -141,6 +139,10 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
     def tearDownClass(cls) -> None:
         """Stop the patcher after running tests."""
         cls.get_patcher.stop()
+    
+    def setUp(self) -> None:
+        """Reset mock call count before each test."""
+        self.mock_get.reset_mock()
 
     def test_public_repos(self) -> None:
         """Test public_repos without license filter."""
