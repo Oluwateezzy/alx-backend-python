@@ -139,7 +139,7 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
     def tearDownClass(cls) -> None:
         """Stop the patcher after running tests."""
         cls.get_patcher.stop()
-    
+
     def setUp(self) -> None:
         """Reset mock call count before each test."""
         self.mock_get.reset_mock()
