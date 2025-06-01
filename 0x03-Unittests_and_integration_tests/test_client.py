@@ -108,6 +108,7 @@ class TestGithubOrgClient(unittest.TestCase):
         result = GithubOrgClient.has_license(repo, license_key)
         self.assertEqual(result, expected)
 
+
 @parameterized_class([
     {
         "org_payload": TEST_PAYLOAD[0][0],
@@ -125,7 +126,9 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         cls.mock_get = cls.get_patcher.start()
 
         def side_effect(url):
-            """Side effect function to return different payloads based on URL."""
+            """
+            Side effect function to return different payloads based on URL
+            """
             if url.endswith("/orgs/google"):
                 return Mock(json=lambda: cls.org_payload)
             if url.endswith("/repos/google/repos"):
