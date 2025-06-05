@@ -124,4 +124,4 @@ class MessageCreateSerializer(serializers.ModelSerializer):
             'message_id',
             'conversation',
             'message_body',
-           
+        ]
