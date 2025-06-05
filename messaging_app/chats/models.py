@@ -1,8 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils.translation import gettext_lazy as _
+import uuid
 
-# Create your models here.
 class User(AbstractUser):
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(_('email address'), unique=True)
+    first_name = models.CharField(_('first name'), max_length=150)
+    last_name = models.CharField(_('last name'), max_length=150)
+    password = models.CharField(_('password'), max_length=128)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     profile_picture = models.ImageField(upload_to="profile_pics/", blank=True, null=True)
     status = models.CharField(max_length=100, blank=True, null=True)
@@ -12,12 +18,12 @@ class User(AbstractUser):
         verbose_name = _('user')
         verbose_name_plural = _('users')
     
-
     def __str__(self):
         return self.username
 
 
 class Conversation(models.Model):
+    conversation_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     participants = models.ManyToManyField(User, related_name="conversations")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -44,6 +50,7 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
+    message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
@@ -54,8 +61,8 @@ class Message(models.Model):
         on_delete=models.CASCADE,
         related_name='sent_messages'
     )
-    content = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
+    message_body = models.TextField()  # Changed from 'content' to 'message_body'
+    sent_at = models.DateTimeField(auto_now_add=True)  # Changed from 'timestamp' to 'sent_at'
     read = models.BooleanField(default=False)
     read_at = models.DateTimeField(blank=True, null=True)
     
@@ -74,9 +81,9 @@ class Message(models.Model):
     )
     
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['-sent_at']
         verbose_name = _('message')
         verbose_name_plural = _('messages')
     
     def __str__(self):
-        return f"Message from {self.sender} in {self.conversation} at {self.timestamp}"
+        return f"Message from {self.sender} in {self.conversation} at {self.sent_at}"
