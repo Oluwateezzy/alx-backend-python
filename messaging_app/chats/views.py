@@ -1,4 +1,7 @@
 from django.shortcuts import render
+
+from .chats.pagination import MessagePagination
+from .chats.filters import MessageFilter
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -65,6 +68,8 @@ class MessageViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['conversation', 'sender', 'read']
     ordering_fields = ['sent_at', 'read_at']
+    filterset_class = MessageFilter
+    pagination_class = MessagePagination
     search_fields = ['message_body']
 
     def get_serializer_class(self):
