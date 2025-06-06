@@ -92,6 +92,12 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         conversation = serializer.validated_data['conversation']
+
+        if request.user not in conversation.participants.all():
+            return Response(
+                {"detail": "You do not have permission to send a message to this conversation."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Permission class already checks if user is participant
         message = Message.objects.create(
