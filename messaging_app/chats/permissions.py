@@ -1,6 +1,6 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import permissions
 
-class IsOwnerOrParticipant(BasePermission):
+class IsOwnerOrParticipant(permissions):
     """
     Custom permission to only allow owners or participants to access their messages/conversations
     """
