@@ -11,11 +11,11 @@ from .serializers import (
     MessageSerializer,
     MessageCreateSerializer
 )
-from .permissions import IsOwnerOrParticipant
+from .permissions import IsParticipantOfConversation
 
 class ConversationViewSet(viewsets.ModelViewSet):
     authentication_classes = [JWTAuthentication]  # Add JWT authentication
-    permission_classes = [IsAuthenticated, IsOwnerOrParticipant]  # Add custom permission
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]  # Add custom permission
     queryset = Conversation.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['is_group', 'participants']
@@ -61,7 +61,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 class MessageViewSet(viewsets.ModelViewSet):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated, IsOwnerOrParticipant]
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
     queryset = Message.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['conversation', 'sender', 'read']
