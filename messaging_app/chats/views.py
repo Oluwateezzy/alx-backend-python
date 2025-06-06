@@ -14,8 +14,8 @@ from .serializers import (
 from .permissions import IsParticipantOfConversation
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    authentication_classes = [JWTAuthentication]  # Add JWT authentication
-    permission_classes = [IsAuthenticated, IsParticipantOfConversation]  # Add custom permission
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
     queryset = Conversation.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['is_group', 'participants']
@@ -28,11 +28,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return ConversationSerializer
 
     def get_queryset(self):
-        # Only show conversations where current user is a participant
-        queryset = self.queryset.filter(participants=self.request.user)
+        # Let the permission class handle participant filtering
+        queryset = super().get_queryset()
         
-        # Apply additional filtering
-        is_group = self.request.query_params.get('is_group', None)
+        # Apply additional query parameters
+        is_group = self.request.query_params.get('is_group')
         if is_group is not None:
             queryset = queryset.filter(is_group=is_group.lower() == 'true')
             
@@ -42,7 +42,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Add current user to participants if not already included
         participants = list(serializer.validated_data['participants'])
         if request.user not in participants:
             participants.append(request.user)
@@ -74,17 +73,15 @@ class MessageViewSet(viewsets.ModelViewSet):
         return MessageSerializer
 
     def get_queryset(self):
-        # Only show messages from conversations the user is in
-        queryset = self.queryset.filter(
-            conversation__participants=self.request.user
-        ).order_by('-sent_at')
+        # Base queryset is filtered by permission class
+        queryset = super().get_queryset().order_by('-sent_at')
         
-        # Apply additional filtering
-        conversation_id = self.request.query_params.get('conversation', None)
+        # Apply additional query parameters
+        conversation_id = self.request.query_params.get('conversation')
         if conversation_id is not None:
             queryset = queryset.filter(conversation_id=conversation_id)
             
-        read_status = self.request.query_params.get('read', None)
+        read_status = self.request.query_params.get('read')
         if read_status is not None:
             queryset = queryset.filter(read=read_status.lower() == 'true')
             
@@ -94,14 +91,9 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Verify user is in the conversation
         conversation = serializer.validated_data['conversation']
-        if request.user not in conversation.participants.all():
-            return Response(
-                {"detail": "You are not a participant in this conversation"},
-                status=status.HTTP_403_FORBIDDEN
-            )
         
+        # Permission class already checks if user is participant
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
@@ -110,8 +102,7 @@ class MessageViewSet(viewsets.ModelViewSet):
             attachment_type=serializer.validated_data.get('attachment_type')
         )
         
-        # Update conversation's updated_at timestamp
-        conversation.save()
+        conversation.save()  # Update conversation's updated_at
         
         return Response(
             MessageSerializer(message).data,
