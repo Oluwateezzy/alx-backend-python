@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Conversation, Message
 from .serializers import (
@@ -10,9 +11,11 @@ from .serializers import (
     MessageSerializer,
     MessageCreateSerializer
 )
+from .permissions import IsOwnerOrParticipant
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]  # Add JWT authentication
+    permission_classes = [IsAuthenticated, IsOwnerOrParticipant]  # Add custom permission
     queryset = Conversation.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['is_group', 'participants']
@@ -57,7 +60,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
         )
 
 class MessageViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, IsOwnerOrParticipant]
     queryset = Message.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = ['conversation', 'sender', 'read']
