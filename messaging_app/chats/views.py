@@ -28,8 +28,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return ConversationSerializer
 
     def get_queryset(self):
-        # Let the permission class handle participant filtering
-        queryset = super().get_queryset()
+        # Filter conversations where user is a participant
+        queryset = Conversation.objects.filter(participants=self.request.user)
         
         # Apply additional query parameters
         is_group = self.request.query_params.get('is_group')
@@ -73,8 +73,10 @@ class MessageViewSet(viewsets.ModelViewSet):
         return MessageSerializer
 
     def get_queryset(self):
-        # Base queryset is filtered by permission class
-        queryset = super().get_queryset().order_by('-sent_at')
+        # Filter messages from conversations where user is a participant
+        queryset = Message.objects.filter(
+            conversation__participants=self.request.user
+        ).order_by('-sent_at')
         
         # Apply additional query parameters
         conversation_id = self.request.query_params.get('conversation')
