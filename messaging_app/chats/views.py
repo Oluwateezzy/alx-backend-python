@@ -1,9 +1,8 @@
 from django.shortcuts import render
-
-# Create your views here.
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Conversation, Message
 from .serializers import (
     ConversationSerializer,
@@ -15,6 +14,10 @@ from .serializers import (
 class ConversationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Conversation.objects.all()
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_fields = ['is_group', 'participants']
+    ordering_fields = ['created_at', 'updated_at']
+    search_fields = ['group_name']
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -23,7 +26,14 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Only show conversations where current user is a participant
-        return self.queryset.filter(participants=self.request.user)
+        queryset = self.queryset.filter(participants=self.request.user)
+        
+        # Apply additional filtering
+        is_group = self.request.query_params.get('is_group', None)
+        if is_group is not None:
+            queryset = queryset.filter(is_group=is_group.lower() == 'true')
+            
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer_class()(data=request.data)
@@ -49,6 +59,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Message.objects.all()
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_fields = ['conversation', 'sender', 'read']
+    ordering_fields = ['sent_at', 'read_at']
+    search_fields = ['message_body']
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -57,9 +71,20 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Only show messages from conversations the user is in
-        return self.queryset.filter(
+        queryset = self.queryset.filter(
             conversation__participants=self.request.user
         ).order_by('-sent_at')
+        
+        # Apply additional filtering
+        conversation_id = self.request.query_params.get('conversation', None)
+        if conversation_id is not None:
+            queryset = queryset.filter(conversation_id=conversation_id)
+            
+        read_status = self.request.query_params.get('read', None)
+        if read_status is not None:
+            queryset = queryset.filter(read=read_status.lower() == 'true')
+            
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer_class()(data=request.data)
