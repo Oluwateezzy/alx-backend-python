@@ -44,7 +44,7 @@ class RestrictAccessByTimeMiddleware:
         
         return self.get_response(request)
 
-class RateLimitMiddleware:
+class OffensiveLanguageMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         # Store request counts and timestamps per IP
