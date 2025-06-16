@@ -1,89 +1,108 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.utils.translation import gettext_lazy as _
+from django.conf import settings
+from django.utils import timezone
+
+# chats/models.py
 import uuid
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.db import models
 
-class User(AbstractUser):
-    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(_('email address'), unique=True)
-    first_name = models.CharField(_('first name'), max_length=150)
-    last_name = models.CharField(_('last name'), max_length=150)
-    password = models.CharField(_('password'), max_length=128)
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
-    profile_picture = models.ImageField(upload_to="profile_pics/", blank=True, null=True)
-    status = models.CharField(max_length=100, blank=True, null=True)
-    last_online = models.DateTimeField(blank=True, null=True)
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("The Email field must be set")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
 
-    class Meta:
-        verbose_name = _('user')
-        verbose_name_plural = _('users')
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, password, **extra_fields)
     
-    def __str__(self):
-        return self.username
 
 
+
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    ROLE_CHOICES = (
+        ('admin', 'Admin'),
+        ('moderator', 'Moderator'),
+        ('user', 'User'),
+    )
+    
+
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='user')  # ✅ Add this line
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name']
+
+    def save(self, *args, **kwargs):
+        self.email = self.__class__.objects.normalize_email(self.email)
+        if not self.pk or not self.password.startswith('pbkdf2_'):
+            self.set_password(self.password)
+        super().save(*args, **kwargs)
+
+    @property
+    def id(self):
+        return self.user_id
+
+    
 class Conversation(models.Model):
     conversation_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    participants = models.ManyToManyField(User, related_name="conversations")
+    participants = models.ManyToManyField(CustomUser, related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    is_group = models.BooleanField(default=False)
-    group_name = models.CharField(max_length=100, blank=True, null=True)
-    group_admin = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='admin_of_groups'
-    )
 
-    class Meta:
-        ordering = ['-updated_at']
-        verbose_name = _('conversation')
-        verbose_name_plural = _('conversations')
-    
     def __str__(self):
-        if self.is_group:
-            return f"Group: {self.group_name}"
-        participants = self.participants.all()
-        return f"Chat between {participants[0]} and {participants[1]}" if len(participants) == 2 else f"Multi-user chat ({len(participants)} users)"
-
-
+        return str(self.pk) 
+    
 class Message(models.Model):
     message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    conversation = models.ForeignKey(
-        Conversation,
-        on_delete=models.CASCADE,
-        related_name='messages'
-    )
-    sender = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='sent_messages'
-    )
-    message_body = models.TextField()  # Changed from 'content' to 'message_body'
-    sent_at = models.DateTimeField(auto_now_add=True)  # Changed from 'timestamp' to 'sent_at'
-    read = models.BooleanField(default=False)
-    read_at = models.DateTimeField(blank=True, null=True)
-    
-    # For media messages
-    attachment = models.FileField(upload_to='message_attachments/', blank=True, null=True)
-    attachment_type = models.CharField(
-        max_length=20,
-        blank=True,
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sent_messages', on_delete=models.CASCADE)
+    receiver = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='received_messages', on_delete=models.CASCADE)
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+    edited = models.BooleanField(default=False)
+
+    edited_at = models.DateTimeField(null=True, blank=True)
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
         null=True,
-        choices=[
-            ('image', 'Image'),
-            ('video', 'Video'),
-            ('document', 'Document'),
-            ('audio', 'Audio')
-        ]
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='message_edits'
     )
-    
-    class Meta:
-        ordering = ['-sent_at']
-        verbose_name = _('message')
-        verbose_name_plural = _('messages')
-    
+
     def __str__(self):
-        return f"Message from {self.sender} in {self.conversation} at {self.sent_at}"
+        return f"From {self.sender} to {self.receiver} at {self.timestamp}"
+    
+class MessageHistory(models.Model):
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='history')
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)  # Time when the message was changed
+
+    def __str__(self):
+        return f"Edit of message {self.message.message_id} at {self.timestamp}"
+
+
+
+class Notification(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='notifications', on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notification for {self.user} about message {self.message.pk}"
