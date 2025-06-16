@@ -84,3 +84,47 @@ class OffensiveLanguageMiddleware:
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+    
+class RolepermissionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        # Define protected paths and required roles
+        self.protected_paths = {
+            '/admin/actions/': ['admin'],
+            '/moderate/': ['admin', 'moderator'],
+            '/api/restricted/': ['admin']
+        }
+
+    def __call__(self, request):
+        current_path = request.path
+        
+        # Check if current path requires special permissions
+        for path, required_roles in self.protected_paths.items():
+            if current_path.startswith(path):
+                # Check if user is authenticated
+                if not request.user.is_authenticated:
+                    return HttpResponseForbidden("Authentication required")
+                
+                # Check if user has any of the required roles
+                user_role = self.get_user_role(request.user)
+                if user_role not in required_roles:
+                    return HttpResponseForbidden("Insufficient permissions")
+                
+                break
+        
+        return self.get_response(request)
+    
+    def get_user_role(self, user):
+        """
+        Get the user's role from their profile or groups
+        You may need to customize this based on your user role implementation
+        """
+        if user.is_superuser:
+            return 'admin'
+        
+        # Example: Check groups (common implementation)
+        if user.groups.filter(name='Moderators').exists():
+            return 'moderator'
+        
+        # Default role for regular users
+        return 'user'
