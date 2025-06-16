@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 
 from datetime import datetime, time
@@ -42,3 +43,44 @@ class RestrictAccessByTimeMiddleware:
                 )
         
         return self.get_response(request)
+
+class RateLimitMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        # Store request counts and timestamps per IP
+        self.request_counts = defaultdict(list)
+        # Rate limit configuration
+        self.limit = 5  # 5 messages
+        self.window = 60  # 60 seconds (1 minute)
+
+    def __call__(self, request):
+        # Only process POST requests to chat endpoints
+        if request.method == 'POST' and request.path.startswith('/chat/'):
+            ip_address = self.get_client_ip(request)
+            current_time = time.time()
+            
+            # Clean up old timestamps
+            self.request_counts[ip_address] = [
+                t for t in self.request_counts[ip_address] 
+                if current_time - t < self.window
+            ]
+            
+            # Check if limit exceeded
+            if len(self.request_counts[ip_address]) >= self.limit:
+                return HttpResponseForbidden(
+                    "Rate limit exceeded: 5 messages per minute allowed. Please wait."
+                )
+            
+            # Record this request
+            self.request_counts[ip_address].append(current_time)
+        
+        return self.get_response(request)
+    
+    def get_client_ip(self, request):
+        """Get the client's IP address from request headers"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
