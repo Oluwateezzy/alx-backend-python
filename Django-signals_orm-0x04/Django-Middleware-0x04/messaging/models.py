@@ -73,8 +73,8 @@ class Message(models.Model):
     conversation = models.ForeignKey('Conversation', on_delete=models.CASCADE, related_name='messages')
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    is_read = models.BooleanField(default=False)  # Existing read field
-    read_at = models.DateTimeField(null=True, blank=True)  # New field to track when message was read
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
     edited = models.BooleanField(default=False)
     edited_at = models.DateTimeField(null=True, blank=True)
     edited_by = models.ForeignKey(
@@ -91,6 +91,9 @@ class Message(models.Model):
         on_delete=models.SET_NULL,
         related_name='replies'
     )
+    @property
+    def unread(self):
+        return not self.is_read
 
     def mark_as_read(self, by_user):
         """
