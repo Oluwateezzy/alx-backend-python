@@ -127,4 +127,22 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    
+class DeleteAccountView(viewsets.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        
+        # Optional: Add confirmation logic (password confirmation, etc.)
+        # if not request.data.get('confirm'):
+        #     return Response({"error": "Confirmation required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Optional: Soft delete instead of hard delete
+        # user.is_active = False
+        # user.save()
+        
+        # Hard delete
+        user.delete()
+        
+        return Response({"detail": "Account deleted successfully"}, 
+                      status=status.HTTP_204_NO_CONTENT)

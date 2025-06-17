@@ -16,19 +16,6 @@ from .pagination import MessageResultsSetPagination
 from .permission import IsParticipantOfConversation
 from .filters import MessageFilter
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
@@ -77,7 +64,6 @@ class MessageViewSet(viewsets.ModelViewSet):
     filterset_class = MessageFilter
 
     def get_queryset(self):
-        # ✅ Only return messages where the request.user is a participant
         return Message.objects.filter(conversation__participants=self.request.user)
     
     def update(self, request, *args, **kwargs):
@@ -88,7 +74,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         message = self.get_object()
 
-        # ✅ Ensure only the sender can edit
         if message.sender != request.user:
             return Response({"detail": "You can only edit your own messages."},
                             status=status.HTTP_403_FORBIDDEN)
@@ -99,7 +84,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
 
         message.content = new_content
-        message.save()  # ✅ This triggers the pre_save signal to log history
+        message.save()
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -124,7 +109,6 @@ class MessageViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_404_NOT_FOUND)
 
         
-        # ✅ Automatically find the receiver from participants
         participants = conversation.participants.all()
         receiver = [user for user in participants if user != request.user]
         receiver = receiver[0] if receiver else None  # Fallback to avoid index error
@@ -133,7 +117,6 @@ class MessageViewSet(viewsets.ModelViewSet):
             return Response({"error": "Receiver could not be determined."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ Now create message with receiver set
         message = Message.objects.create(
             sender=request.user,
             receiver=receiver,
@@ -144,4 +127,22 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    
+class DeleteAccountView(viewsets.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        
+        # Optional: Add confirmation logic (password confirmation, etc.)
+        # if not request.data.get('confirm'):
+        #     return Response({"error": "Confirmation required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Optional: Soft delete instead of hard delete
+        # user.is_active = False
+        # user.save()
+        
+        # Hard delete
+        user.delete()
+        
+        return Response({"detail": "Account deleted successfully"}, 
+                      status=status.HTTP_204_NO_CONTENT)
