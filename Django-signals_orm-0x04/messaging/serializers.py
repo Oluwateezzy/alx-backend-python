@@ -57,6 +57,16 @@ class MessageSerializer(serializers.ModelSerializer):
                 "Either message_body or attachment must be provided"
             )
         return data
+    
+    def get_replies(self, obj):
+        # Only show replies if we're not already in a thread view
+        if 'thread' not in self.context.get('request').path:
+            return []
+        return MessageSerializer(
+            obj.replies.all().select_related('sender', 'receiver'),
+            many=True,
+            context=self.context
+        ).data
 
 class ConversationSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)

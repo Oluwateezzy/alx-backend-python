@@ -65,7 +65,16 @@ class MessageViewSet(viewsets.ModelViewSet):
     filterset_class = MessageFilter
 
     def get_queryset(self):
-        return Message.objects.filter(conversation__participants=self.request.user)
+        # Optimize queries with select_related and prefetch_related
+        return Message.objects.filter(
+            conversation__participants=self.request.user
+        ).select_related(
+            'sender',
+            'receiver',
+            'conversation'
+        ).prefetch_related(
+            Prefetch('replies', queryset=Message.objects.select_related('sender', 'receiver'))
+        )
     
     def update(self, request, *args, **kwargs):
         """
