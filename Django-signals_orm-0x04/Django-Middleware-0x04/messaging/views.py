@@ -1,4 +1,5 @@
 
+from django.dispatch import receiver
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -128,21 +129,52 @@ class MessageViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
 class DeleteAccountView(viewsets.APIView):
+    """
+    API endpoint for users to delete their own account.
+    Automatically cleans up related messages and conversations.
+    """
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, *args, **kwargs):
         user = request.user
         
-        # Optional: Add confirmation logic (password confirmation, etc.)
+        # Optional confirmation step (uncomment to use)
         # if not request.data.get('confirm'):
-        #     return Response({"error": "Confirmation required"}, status=status.HTTP_400_BAD_REQUEST)
+        #     return Response(
+        #         {"error": "Confirmation required. Send 'confirm': true in request body"},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
         
-        # Optional: Soft delete instead of hard delete
-        # user.is_active = False
-        # user.save()
+        # Get all conversations the user is part of before deletion
+        user_conversations = user.conversations.all()
         
-        # Hard delete
+        # Delete the user (this will trigger our post_delete signal)
         user.delete()
         
-        return Response({"detail": "Account deleted successfully"}, 
-                      status=status.HTTP_204_NO_CONTENT)
+        # Clean up empty conversations
+        for conversation in user_conversations:
+            if conversation.participants.count() == 0:
+                conversation.delete()
+        
+        return Response(
+            {"detail": "Account and all related data deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+@receiver(post_delete, sender=get_user_model())
+def cleanup_user_messages(sender, instance, **kwargs):
+    """
+    Signal handler to clean up messaging data when a user is deleted.
+    Handles:
+    - Messages where user was sender
+    - Messages where user was receiver
+    - Conversations where user was the only participant
+    """
+    # Delete all messages where user was sender or receiver
+    Message.objects.filter(sender=instance).delete()
+    Message.objects.filter(receiver=instance).delete()
+    
+    # Clean up conversations where user was the only participant
+    for conversation in instance.conversations.all():
+        if conversation.participants.count() <= 1:
+            conversation.delete()
