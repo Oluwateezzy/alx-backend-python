@@ -168,6 +168,22 @@ def delete_user(request):
         {"detail": "Account and all related data deleted successfully"},
         status=status.HTTP_204_NO_CONTENT
     )
+
+@login_required
+@method_decorator(cache_page(60))  # Cache for 60 seconds
+def unread_messages(request):
+    """View showing only unread messages for the current user"""
+    messages = Message.unread.unread_for_user(request.user).only(
+            'message_id',
+            'sender__username',
+            'content',
+            'timestamp'
+        )
+    
+    return render(request, 'messaging/unread.html', {
+        'unread_messages': messages,
+        'unread_count': messages.count()  # Efficient count
+    })
     
 class DeleteAccountView(viewsets.APIView):
     """
