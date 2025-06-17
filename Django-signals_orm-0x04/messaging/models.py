@@ -73,7 +73,8 @@ class Message(models.Model):
     conversation = models.ForeignKey('Conversation', on_delete=models.CASCADE, related_name='messages')
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    is_read = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False)  # Existing read field
+    read_at = models.DateTimeField(null=True, blank=True)  # New field to track when message was read
     edited = models.BooleanField(default=False)
     edited_at = models.DateTimeField(null=True, blank=True)
     edited_by = models.ForeignKey(
@@ -83,7 +84,6 @@ class Message(models.Model):
         on_delete=models.SET_NULL,
         related_name='message_edits'
     )
-    # New self-referential foreign key for replies
     parent_message = models.ForeignKey(
         'self',
         null=True,
@@ -91,6 +91,17 @@ class Message(models.Model):
         on_delete=models.SET_NULL,
         related_name='replies'
     )
+
+    def mark_as_read(self, by_user):
+        """
+        Mark the message as read by a specific user
+        """
+        if self.receiver == by_user and not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save()
+            return True
+        return False
 
     def __str__(self):
         return f"From {self.sender} to {self.receiver} at {self.timestamp}"
