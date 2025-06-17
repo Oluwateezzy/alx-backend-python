@@ -127,6 +127,38 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_user(request):
+    """
+    Function-based view to allow authenticated users to delete their account.
+    Automatically deletes related messages and conversations.
+    """
+    user = request.user
+
+    # Optional confirmation step (uncomment to use)
+    # if not request.data.get('confirm'):
+    #     return Response(
+    #         {"error": "Confirmation required. Send 'confirm': true in request body"},
+    #         status=status.HTTP_400_BAD_REQUEST
+    #     )
+
+    user_conversations = user.conversations.all()
+    
+    # Delete the user (triggers post_delete signal)
+    user.delete()
+
+    # Clean up any empty conversations
+    for conversation in user_conversations:
+        if conversation.participants.count() == 0:
+            conversation.delete()
+
+    return Response(
+        {"detail": "Account and all related data deleted successfully"},
+        status=status.HTTP_204_NO_CONTENT
+    )
     
 class DeleteAccountView(viewsets.APIView):
     """
