@@ -70,12 +70,11 @@ class Message(models.Model):
     message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sent_messages', on_delete=models.CASCADE)
     receiver = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, related_name='received_messages', on_delete=models.CASCADE)
-    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
+    conversation = models.ForeignKey('Conversation', on_delete=models.CASCADE, related_name='messages')
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
     edited = models.BooleanField(default=False)
-
     edited_at = models.DateTimeField(null=True, blank=True)
     edited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -84,9 +83,29 @@ class Message(models.Model):
         on_delete=models.SET_NULL,
         related_name='message_edits'
     )
+    # New self-referential foreign key for replies
+    parent_message = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='replies'
+    )
 
     def __str__(self):
         return f"From {self.sender} to {self.receiver} at {self.timestamp}"
+
+    @property
+    def is_reply(self):
+        """Check if this message is a reply to another message"""
+        return self.parent_message is not None
+
+    def get_reply_count(self):
+        """Get the number of replies to this message"""
+        return self.replies.count()
+
+    class Meta:
+        ordering = ['-timestamp']
     
 class MessageHistory(models.Model):
     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='history')
