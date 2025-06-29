@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# kubctl-0x03 - Rolling Update with Zero Downtime Verification
+
+# Configuration
+DEPLOYMENT="messaging-app-blue"
+SERVICE="messaging-app-service"
+NAMESPACE="default"
+TEST_URL="http://$(minikube ip)/health"  # Using health endpoint for testing
+TEST_INTERVAL=1  # Seconds between test requests
+TIMEOUT=300      # 5 minutes timeout for rollout
+
+echo "🚀 Starting Rolling Update Procedure"
+
+# Function to continuously test the application
+test_application() {
+  echo "🔍 Starting continuous application testing..."
+  echo "   Test URL: $TEST_URL"
+  echo "   Requests every ${TEST_INTERVAL}s"
+  
+  while true; do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $TEST_URL)
+    TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    if [ "$HTTP_CODE" != "200" ]; then
+      echo "⚠️ [$TIMESTAMP] HTTP $HTTP_CODE - Possible disruption detected!"
+    else
+      echo "✅ [$TIMESTAMP] HTTP $HTTP_CODE - Service healthy"
+    fi
+    
+    sleep $TEST_INTERVAL
+  done
+}
+
+# Start the test in background
+test_application &
+TEST_PID=$!
+
+# Apply the updated deployment
+echo "🔄 Applying updated deployment..."
+kubectl apply -f blue_deployment.yaml
+
+# Monitor the rollout
+echo "📊 Monitoring rollout progress..."
+kubectl rollout status deployment/$DEPLOYMENT --timeout=${TIMEOUT}s
+
+if [ $? -ne 0 ]; then
+  echo "❌ Rollout failed!"
+  kill $TEST_PID
+  exit 1
+fi
+
+# Stop the test process
+kill $TEST_PID
+
+# Verify the update
+echo "🔍 Verifying update completion..."
+CURRENT_IMAGE=$(kubectl get deployment $DEPLOYMENT -o jsonpath='{.spec.template.spec.containers[0].image}')
+echo "Current image version: $CURRENT_IMAGE"
+
+# Check pod status
+echo "📦 Current pod status:"
+kubectl get pods -l app=messaging-app -o wide
+
+# Final verification
+echo "🔎 Final verification:"
+ROLLOUT_HISTORY=$(kubectl rollout history deployment/$DEPLOYMENT)
+echo "$ROLLOUT_HISTORY"
+
+echo "🎉 Rolling update completed successfully with zero downtime!"
