@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# kubectl-0x01 - Kubernetes Scaling and Load Testing Script
+
+# Set variables
+DEPLOYMENT="django-messaging-app"
+SERVICE="django-messaging-service"
+NAMESPACE="default"
+TEST_DURATION="30s"
+CONCURRENT_USERS=10
+TOTAL_REQUESTS=1000
+
+echo "🚀 Starting Kubernetes Scaling and Load Test Procedure"
+
+# Function to check command existence
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Verify prerequisites
+echo "🔍 Checking prerequisites..."
+if ! command_exists kubectl; then
+  echo "❌ kubectl not found. Please install it first."
+  exit 1
+fi
+
+if ! command_exists wrk; then
+  echo "⚠️ wrk not found. Installing wrk..."
+  if command_exists apt-get; then
+    sudo apt-get update && sudo apt-get install -y wrk
+  elif command_exists brew; then
+    brew install wrk
+  else
+    echo "❌ Cannot auto-install wrk. Please install it manually."
+    exit 1
+  fi
+fi
+
+# Scale the deployment
+echo "📈 Scaling deployment $DEPLOYMENT to 3 replicas..."
+kubectl scale deployment/$DEPLOYMENT --replicas=3 -n $NAMESPACE
+
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to scale deployment"
+  exit 1
+fi
+
+# Wait for scaling to complete
+echo "⏳ Waiting for pods to be ready..."
+kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=90s
+
+if [ $? -ne 0 ]; then
+  echo "❌ Deployment rollout failed"
+  exit 1
+fi
+
+# Verify pod status
+echo "📊 Current pod status:"
+kubectl get pods -n $NAMESPACE -l app=django-messaging -o wide
+
+# Get service URL
+echo "🔗 Getting service URL..."
+SERVICE_URL=$(minikube service $SERVICE -n $NAMESPACE --url 2>/dev/null)
+
+if [ -z "$SERVICE_URL" ]; then
+  echo "ℹ️ Couldn't get minikube service URL. Using ClusterIP..."
+  CLUSTER_IP=$(kubectl get svc $SERVICE -n $NAMESPACE -o jsonpath='{.spec.clusterIP}')
+  SERVICE_PORT=$(kubectl get svc $SERVICE -n $NAMESPACE -o jsonpath='{.spec.ports[0].port}')
+  SERVICE_URL="http://$CLUSTER_IP:$SERVICE_PORT"
+fi
+
+echo "🌐 Service endpoint: $SERVICE_URL"
+
+# Perform load test
+echo "⚡ Starting load test with wrk..."
+echo "   Duration: $TEST_DURATION"
+echo "   Concurrent users: $CONCURRENT_USERS"
+echo "   Total requests: $TOTAL_REQUESTS"
+
+wrk -t$CONCURRENT_USERS -c$CONCURRENT_USERS -d$TEST_DURATION --latency $SERVICE_URL
+
+if [ $? -ne 0 ]; then
+  echo "⚠️ Load test failed, but continuing with monitoring"
+fi
+
+# Monitor resource usage
+echo "📊 Monitoring resource usage..."
+echo "   Initial resource snapshot:"
+kubectl top pods -n $NAMESPACE -l app=django-messaging
+
+echo "🔄 Monitoring during test (every 5 seconds)..."
+for i in {1..6}; do
+  sleep 5
+  echo "   [Interval $i] $(date '+%H:%M:%S')"
+  kubectl top pods -n $NAMESPACE -l app=django-messaging
+done
+
+# Final status
+echo "✅ Scaling and load test complete"
+echo "🔍 Final pod status:"
+kubectl get pods -n $NAMESPACE -l app=django-messaging -o wide
+
+echo "📈 Final resource usage:"
+kubectl top pods -n $NAMESPACE -l app=django-messaging
+
+echo "🎉 All operations completed successfully!"
