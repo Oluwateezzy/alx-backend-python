@@ -1,5 +1,5 @@
 # Install Nginx Ingress Controller
-minikube addons enable ingress
+minikube addons enable ingress 
 
 # Verify the ingress controller is running
 kubectl get pods -n ingress-nginx
