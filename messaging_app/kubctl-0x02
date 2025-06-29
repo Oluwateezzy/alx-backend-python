@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# kubctl-0x02 - Blue-Green Deployment Script
+
+echo "🚀 Starting Blue-Green Deployment Procedure"
+
+# Function to check deployment status
+check_deployment() {
+  echo "🔍 Checking deployment $1..."
+  kubectl rollout status deployment/$1 --timeout=120s
+  if [ $? -ne 0 ]; then
+    echo "❌ Deployment $1 failed"
+    exit 1
+  fi
+  echo "✅ Deployment $1 is ready"
+}
+
+# Function to check pod logs
+check_logs() {
+  echo "📋 Checking logs for deployment $1..."
+  POD_NAME=$(kubectl get pods -l version=$1 -o jsonpath="{.items[0].metadata.name}")
+  kubectl logs $POD_NAME --tail=50 | grep -i error
+  if [ $? -eq 0 ]; then
+    echo "⚠️ Errors found in $1 logs"
+  else
+    echo "✅ No errors found in $1 logs"
+  fi
+}
+
+# Deploy blue version (current)
+echo "🔵 Deploying Blue version..."
+kubectl apply -f blue_deployment.yaml
+check_deployment "messaging-app-blue"
+
+# Deploy green version (new)
+echo "🟢 Deploying Green version..."
+kubectl apply -f green_deployment.yaml
+check_deployment "messaging-app-green"
+
+# Check green version logs before switching
+check_logs "green"
+
+# Apply service configuration
+echo "🔄 Applying service configuration..."
+kubectl apply -f kubeservice.yaml
+
+# Switch traffic to green version
+echo "🔄 Switching traffic to Green version..."
+kubectl patch service messaging-app-service -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Verify switch
+echo "🔍 Verifying traffic switch..."
+CURRENT_VERSION=$(kubectl get svc messaging-app-service -o jsonpath='{.spec.selector.version}')
+echo "Current live version: $CURRENT_VERSION"
+
+# Check blue version logs (optional)
+check_logs "blue"
+
+# Scale down blue version (optional)
+echo "🔽 Scaling down Blue version..."
+kubectl scale deployment messaging-app-blue --replicas=0
+
+echo "🎉 Blue-Green deployment completed successfully!"
