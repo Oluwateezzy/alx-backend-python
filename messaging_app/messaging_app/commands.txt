@@ -1,0 +1,21 @@
+# Install Nginx Ingress Controller
+minikube addons enable ingress
+
+# Verify the ingress controller is running
+kubectl get pods -n ingress-nginx
+
+# Apply the Ingress configuration
+kubectl apply -f ingress.yaml
+
+# Verify the Ingress resource
+kubectl get ingress
+
+# For Minikube, get the external IP (may take a few minutes to be available)
+minikube ip
+
+# Add the host to your /etc/hosts (replace IP with minikube ip)
+echo "$(minikube ip) django-app.local" | sudo tee -a /etc/hosts
+
+# Test the Ingress
+curl http://django-app.local
+curl http://django-app.local/api/
