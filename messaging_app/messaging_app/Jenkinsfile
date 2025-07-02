@@ -1,0 +1,155 @@
+pipeline {
+    agent any
+    
+    environment {
+        PYTHON_VERSION = '3.8'
+        VENV_NAME = 'messaging_app_env'
+    }
+    
+    triggers {
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo 'Pulling source code from GitHub...'
+                }
+                // Checkout code from GitHub repository
+                git branch: 'main',
+                    credentialsId: 'github-credentials',
+                    url: 'https://github.com/Oluwateezzy/alx-backend-python'
+                
+                // Navigate to messaging_app directory
+                script {
+                    if (!fileExists('messaging_app')) {
+                        error('messaging_app directory not found in repository')
+                    }
+                }
+            }
+        }
+        
+        stage('Setup Python Environment') {
+            steps {
+                dir('messaging_app') {
+                    script {
+                        echo 'Setting up Python virtual environment...'
+                    }
+                    // Create virtual environment and install dependencies
+                    sh '''
+                        python3 -m venv ${VENV_NAME}
+                        . ${VENV_NAME}/bin/activate
+                        pip install --upgrade pip
+                        
+                        # Install dependencies if requirements.txt exists
+                        if [ -f requirements.txt ]; then
+                            pip install -r requirements.txt
+                        fi
+                        
+                        # Install pytest and coverage tools
+                        pip install pytest pytest-html pytest-cov pytest-xvfb
+                        
+                        # List installed packages for debugging
+                        pip list
+                    '''
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                dir('messaging_app') {
+                    script {
+                        echo 'Running tests with pytest...'
+                    }
+                    sh '''
+                        . ${VENV_NAME}/bin/activate
+                        
+                        # Run pytest with various output formats
+                        pytest \
+                            --verbose \
+                            --tb=short \
+                            --html=reports/pytest_report.html \
+                            --self-contained-html \
+                            --cov=. \
+                            --cov-report=html:reports/coverage_html \
+                            --cov-report=xml:reports/coverage.xml \
+                            --junit-xml=reports/junit_results.xml \
+                            tests/ || true
+                    '''
+                }
+            }
+        }
+        
+        stage('Generate Test Reports') {
+            steps {
+                dir('messaging_app') {
+                    script {
+                        echo 'Processing test results and generating reports...'
+                    }
+                    
+                    // Publish JUnit test results
+                    publishTestResults testResultsPattern: 'reports/junit_results.xml'
+                    
+                    // Publish HTML reports
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'pytest_report.html',
+                        reportName: 'PyTest HTML Report',
+                        reportTitles: 'Test Results'
+                    ])
+                    
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports/coverage_html',
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report',
+                        reportTitles: 'Code Coverage'
+                    ])
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                echo 'Pipeline execution completed.'
+            }
+            // Clean up workspace if needed
+            dir('messaging_app') {
+                sh '''
+                    if [ -d "${VENV_NAME}" ]; then
+                        rm -rf ${VENV_NAME}
+                    fi
+                '''
+            }
+        }
+        
+        success {
+            script {
+                echo 'Pipeline executed successfully! ✅'
+                echo 'Test reports are available in the build artifacts.'
+            }
+        }
+        
+        failure {
+            script {
+                echo 'Pipeline failed! ❌'
+                echo 'Check the console output and test reports for details.'
+            }
+        }
+        
+        unstable {
+            script {
+                echo 'Pipeline completed with test failures! ⚠️'
+                echo 'Some tests failed. Check the test reports for details.'
+            }
+        }
+    }
+}
