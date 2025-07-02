@@ -1,0 +1,74 @@
+name: Django CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  PYTHON_VERSION: '3.8'
+  DATABASE_URL: mysql://root:root@localhost:3306/messaging_db
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: messaging_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r messaging_app/requirements.txt
+        pip install pytest pytest-html pytest-cov pytest-xvfb
+
+    - name: Run migrations
+      run: |
+        cd messaging_app
+        python manage.py makemigrations
+        python manage.py migrate
+      env:
+        DJANGO_SETTINGS_MODULE: messaging_app.settings
+
+    - name: Run tests
+      run: |
+        cd messaging_app
+        pytest \
+          --verbose \
+          --tb=short \
+          --html=pytest_report.html \
+          --self-contained-html \
+          --cov=. \
+          --cov-report=html:coverage_html \
+          --cov-report=xml:coverage.xml \
+          --junit-xml=junit_results.xml \
+          tests/
+      env:
+        DJANGO_SETTINGS_MODULE: messaging_app.settings
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          messaging_app/pytest_report.html
+          messaging_app/coverage_html/
+          messaging_app/coverage.xml
+          messaging_app/junit_results.xml
