@@ -43,14 +43,14 @@ pipeline {
                         
                         # Install dependencies if requirements.txt exists
                         if [ -f requirements.txt ]; then
-                            pip install -r requirements.txt
+                            pip3 install -r requirements.txt
                         fi
                         
                         # Install pytest and coverage tools
-                        pip install pytest pytest-html pytest-cov pytest-xvfb
+                        pip3 install pytest pytest-html pytest-cov pytest-xvfb
                         
                         # List installed packages for debugging
-                        pip list
+                        pip3 list
                     '''
                 }
             }
