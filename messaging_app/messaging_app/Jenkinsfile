@@ -4,6 +4,9 @@ pipeline {
     environment {
         PYTHON_VERSION = '3.8'
         VENV_NAME = 'messaging_app_env'
+        DOCKER_IMAGE = 'oluwateezzy03/messaging-app'
+        DOCKER_TAG = "${env.BUILD_ID}"
+        DOCKER_CREDENTIALS = 'dockerhub-credentials'
     }
     
     triggers {
@@ -114,6 +117,50 @@ pipeline {
                 }
             }
         }
+        
+        stage('Build Docker Image') {
+            when {
+                expression { 
+                    currentBuild.resultIsBetterOrEqualTo('UNSTABLE') 
+                }
+            }
+            steps {
+                dir('messaging_app') {
+                    script {
+                        echo 'Building Docker image...'
+                        // Check if Dockerfile exists
+                        if (!fileExists('Dockerfile')) {
+                            error('Dockerfile not found in messaging_app directory')
+                        }
+                        
+                        // Build the Docker image
+                        docker.withRegistry('https://registry.hub.docker.com', DOCKER_CREDENTIALS) {
+                            dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}", ".")
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Push Docker Image') {
+            when {
+                expression { 
+                    currentBuild.resultIsBetterOrEqualTo('UNSTABLE') 
+                }
+            }
+            steps {
+                script {
+                    echo 'Pushing Docker image to Docker Hub...'
+                    docker.withRegistry('https://registry.hub.docker.com', DOCKER_CREDENTIALS) {
+                        dockerImage.push("${DOCKER_TAG}")
+                        // Optionally push as 'latest' if this is a main branch build
+                        if (env.BRANCH_NAME == 'main') {
+                            dockerImage.push('latest')
+                        }
+                    }
+                }
+            }
+        }
     }
     
     post {
@@ -135,6 +182,7 @@ pipeline {
             script {
                 echo 'Pipeline executed successfully! ✅'
                 echo 'Test reports are available in the build artifacts.'
+                echo "Docker image pushed: ${DOCKER_IMAGE}:${DOCKER_TAG}"
             }
         }
         
